@@ -1,22 +1,24 @@
-import React, { useState } from "react";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { router } from "expo-router";
+import { useState } from "react";
 import {
-  View,
-  Text,
-  TouchableWithoutFeedback,
-  Keyboard,
   ActivityIndicator,
+  Alert,
   Image,
+  Keyboard,
+  StatusBar,
+  Text,
   TextInput,
   TouchableOpacity,
-  Alert,
-  StatusBar,
+  TouchableWithoutFeedback,
   useColorScheme,
+  View,
 } from "react-native";
-import { router } from "expo-router";
 import tw from "twrnc";
+
 import { COLORS } from "../../constants/theme";
-import Ionicons from "@expo/vector-icons/Ionicons";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import useAuth from "../../hooks/useAuth";
 
 export default function Login() {
   const colorScheme = useColorScheme();
@@ -24,6 +26,7 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const { signIn } = useAuth();
 
   const toggleShowPassword = () => {
     setShowPassword(!showPassword);
@@ -33,27 +36,18 @@ export default function Login() {
     return email && password;
   };
 
-  const handleLoginAccount = () => {
-    const defaultEmail = "driver@gmail.com";
-    const defaultPassword = "driverpassword";
-
-    // Start loading
+  const handleLoginAccount = async () => {
     setLoading(true);
-
-    // Simulate a network request
-    setTimeout(() => {
-      if (email === defaultEmail && password === defaultPassword) {
-        router.push("/authenticated/dashboard");
-      } else {
-        Alert.alert(
-          "Login Error",
-          "Invalid email or password. Please try again."
-        );
-      }
-
-      // Stop loading
-      setLoading(false);
-    }, 2000);
+    const { error } = await signIn(email, password);
+    setLoading(false);
+    if (error) {
+      Alert.alert(
+        "Login Error",
+        error.message || "Invalid email or password. Please try again."
+      );
+    } else {
+      router.replace("/authenticated/dashboard");
+    }
   };
 
   return (
@@ -110,25 +104,28 @@ export default function Login() {
               style={tw.style({
                 backgroundColor: "#f9fafb",
                 borderRadius: 12,
-                paddingTop: 12,
-                paddingBottom: 14,
-                paddingHorizontal: 8,
+                paddingTop: 14,
+                paddingBottom: 16,
+                paddingHorizontal: 12,
                 fontSize: 12,
               })}
               placeholder="Enter your email"
-              onChangeText={setEmail}
+              onChangeText={(text) =>
+                setEmail(text.charAt(0).toLowerCase() + text.slice(1))
+              }
               keyboardType="email-address"
               placeholderTextColor="#aaa"
               underlineColorAndroid="transparent"
+              autoCapitalize="none"
             />
 
             <View
               style={tw.style("flex-row justify-between items-center", {
                 backgroundColor: "#f9fafb",
                 borderRadius: 12,
-                paddingTop: 12,
-                paddingBottom: 14,
-                paddingHorizontal: 8,
+                paddingTop: 14,
+                paddingBottom: 16,
+                paddingHorizontal: 12,
               })}
             >
               <TextInput

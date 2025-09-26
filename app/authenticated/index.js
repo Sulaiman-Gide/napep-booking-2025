@@ -1,4 +1,3 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Location from "expo-location";
@@ -21,6 +20,7 @@ import tailwind from "twrnc";
 import PlusIcon from "../../assets/images/plus-icon.svg";
 import UserAvatar from "../../assets/images/userAvatar.svg";
 import { useTabVisibility } from "../../context/TabVisibilityContext";
+import useAuth from "../../hooks/useAuth";
 import { createRideRequest } from "../../lib/services/rideService";
 import { supabase } from "../../lib/supabase";
 
@@ -29,6 +29,7 @@ export default function Home({ navigation }) {
   const [isBooking, setIsBooking] = useState(false);
   const [userBalance, setUserBalance] = useState(0);
   const [totalSpent, setTotalSpent] = useState(0);
+  const { user } = useAuth();
   const { setTabBarVisible } = useTabVisibility();
   const [location, setLocation] = useState(null);
   const [destination, setDestination] = useState(null);
@@ -73,25 +74,27 @@ export default function Home({ navigation }) {
     React.useCallback(() => {
       const fetchUserData = async () => {
         try {
-          const name = await AsyncStorage.getItem("loggedInUserName");
-          const balance = await AsyncStorage.getItem("loggedInUserBalance");
-          const totalSpent = await AsyncStorage.getItem("totalSpent");
-
-          if (name) {
-            setUserName(name);
-          } else {
-            setUserName("Guest");
+          let dbBalance = 0;
+          let dbName = "Guest";
+          if (user) {
+            const { data: userData, error } = await supabase
+              .from("users")
+              .select("full_name, wallet_balance")
+              .eq("id", user.id)
+              .single();
+            if (!error && userData) {
+              dbBalance = parseFloat(userData.wallet_balance) || 0;
+              dbName = userData.full_name || "Guest";
+            }
           }
-
-          setUserBalance(parseFloat(balance) || 0);
-          setTotalSpent(parseFloat(totalSpent) || 0);
+          setUserName(dbName);
+          setUserBalance(dbBalance);
         } catch (error) {
           console.error("Error fetching user data: ", error);
         }
       };
-
       fetchUserData();
-    }, [])
+    }, [user])
   );
 
   // Get user location
@@ -196,6 +199,18 @@ export default function Home({ navigation }) {
 
       const distanceInMeters = getDistance(location.coords, destination);
       const cost = Math.round(distanceInMeters * 2);
+
+      if (userBalance < cost) {
+        Alert.alert(
+          "Insufficient Balance",
+          `You need ₦${cost.toLocaleString(
+            "en-NG"
+          )} to book this ride. Please fund your wallet.`
+        );
+        setIsBooking(false);
+        return;
+      }
+
       const address = await getReverseGeocode(destination);
       setDestinationAddress(address);
 
@@ -215,21 +230,6 @@ export default function Home({ navigation }) {
       const { data, error } = await createRideRequest(rideData);
 
       if (error) throw error;
-
-      // Update wallet balance and total spent
-      let balance = await AsyncStorage.getItem("loggedInUserBalance");
-      let spent = await AsyncStorage.getItem("totalSpent");
-      balance = parseFloat(balance) || 0;
-      spent = parseFloat(spent) || 0;
-
-      const newBalance = balance - cost;
-      const newSpent = spent + cost;
-
-      await AsyncStorage.setItem("loggedInUserBalance", newBalance.toString());
-      await AsyncStorage.setItem("totalSpent", newSpent.toString());
-
-      setUserBalance(newBalance);
-      setTotalSpent(newSpent);
 
       Alert.alert(
         "Ride Booked",

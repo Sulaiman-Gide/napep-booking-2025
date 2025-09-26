@@ -1,5 +1,4 @@
 import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
-import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { Tabs } from "expo-router";
 import React from "react";
 import { Image, Platform, StyleSheet, View } from "react-native";
@@ -45,7 +44,7 @@ const TabLayout: React.FC<TabLayoutProps> = ({ tabBarVisible }) => {
           ),
           tabBarIcon: ({ focused }: TabIconProps) => (
             <View style={styles.iconContainer}>
-              <HomeNonactive />
+              <HomeNonactive width={24} height={24} />
             </View>
           ),
         }}
@@ -62,12 +61,7 @@ const TabLayout: React.FC<TabLayoutProps> = ({ tabBarVisible }) => {
           ),
           tabBarIcon: ({ focused }: TabIconProps) => (
             <View style={styles.iconContainer}>
-              <MaterialIcons
-                name="payment"
-                size={24}
-                color="#757575"
-                style={[styles.icon, focused && styles.iconFocused]}
-              />
+              <HomeNonactive width={24} height={24} />
             </View>
           ),
         }}

@@ -1,4 +1,3 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
@@ -13,6 +12,8 @@ import {
   View,
 } from "react-native";
 import tailwind from "twrnc";
+import useAuth from "../../hooks/useAuth";
+import { supabase } from "../../lib/supabase";
 
 // Icons
 import Entypo from "@expo/vector-icons/Entypo";
@@ -33,6 +34,7 @@ const Content = () => {
   // State
   const [userName, setUserName] = useState("");
   const [userBalance, setUserBalance] = useState(0);
+  const { user } = useAuth();
   const [transactions, setTransactions] = useState([]);
   const [showAll, setShowAll] = useState(false);
   const [totalSpent, setTotalSpent] = useState(0);
@@ -44,24 +46,26 @@ const Content = () => {
   const bottomSheetRef = useRef(null);
   const successBottomSheetRef = useRef(null);
 
-  // Fetch user data
+  // Fetch user data and wallet balance from database
   const fetchUserData = async () => {
     try {
       setIsLoading(true);
-      const [name, balance, totalSpent, transactionsData] = await Promise.all([
-        AsyncStorage.getItem("loggedInUserName"),
-        AsyncStorage.getItem("loggedInUserBalance"),
-        AsyncStorage.getItem("totalSpent"),
-        AsyncStorage.getItem("userTransactions"),
-      ]);
-
-      setUserName(name || "Guest");
-      setUserBalance(parseFloat(balance) || 0);
-      setTotalSpent(parseFloat(totalSpent) || 0);
-
-      if (transactionsData) {
-        setTransactions(JSON.parse(transactionsData));
+      let dbBalance = 0;
+      let dbName = "Guest";
+      if (user) {
+        const { data: userData, error } = await supabase
+          .from("users")
+          .select("full_name, wallet_balance")
+          .eq("id", user.id)
+          .single();
+        if (!error && userData) {
+          dbBalance = parseFloat(userData.wallet_balance) || 0;
+          dbName = userData.full_name || "Guest";
+        }
       }
+      setUserName(dbName);
+      setUserBalance(dbBalance);
+      // Transactions and totalSpent can remain local for now
     } catch (error) {
       console.error("Error fetching user data: ", error);
     } finally {
@@ -89,35 +93,20 @@ const Content = () => {
     }
   };
 
-  const handlePaymentSuccess = (amount) => {
-    const newBalance = userBalance + parseFloat(amount);
-    setUserBalance(newBalance);
-    AsyncStorage.setItem("loggedInUserBalance", newBalance.toString());
-    setIsPaymentSuccessful(true);
-
-    // Create a new transaction (credit)
-    const newTransaction = {
-      id: transactions.length + 1,
-      name: "Account Credit",
-      type: "Wallet credit",
-      amount: `+ ₦ ${amount}`,
-      color: "green",
-    };
-
-    // Update transactions state
-    const updatedTransactions = [...transactions, newTransaction];
-    setTransactions(updatedTransactions);
-
-    // Save transactions to AsyncStorage
-    AsyncStorage.setItem(
-      "userTransactions",
-      JSON.stringify(updatedTransactions)
-    );
-
-    // Update the total spent if applicable
-    const newTotalSpent = totalSpent; // No need to update totalSpent for credit transactions
-    setTotalSpent(newTotalSpent);
-
+  // Fund wallet in the database and update UI
+  const handlePaymentSuccess = async (amount) => {
+    if (!user) return;
+    // Update wallet_balance in the database
+    const { data, error } = await supabase
+      .from("users")
+      .update({ wallet_balance: userBalance + parseFloat(amount) })
+      .eq("id", user.id)
+      .select();
+    if (!error) {
+      setUserBalance(userBalance + parseFloat(amount));
+      setIsPaymentSuccessful(true);
+    }
+    // Transactions and totalSpent can remain local for now
     if (successBottomSheetRef.current) {
       successBottomSheetRef.current.expand();
     }
